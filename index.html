@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateUI() {
         cycleCounterEl.textContent = `Цикл ${state.currentCycle || 0} / ${state.settings.cycles || 5}`;
-        let labelText = '';
+        let labelText = 'Приготовьтесь';
         let buttonColor = 'bg-gray-400';
         let buttonIconHTML = ICONS_SVG.play;
         let phaseIconHTML = '';
@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const startBtn = document.getElementById('start-visualizer-btn');
             if(startBtn) startBtn.classList.remove('hidden');
             phaseIcon.innerHTML = '';
-            phaseLabel.textContent = 'Приготовьтесь';
+            phaseLabel.textContent = '';
             updateUI();
         } else {
             state.fsm = 'ready';
