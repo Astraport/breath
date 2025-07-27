@@ -80,8 +80,8 @@
                 </div>
 
                 <div>
-                    <label for="cycles-slider" class="block text-sm font-medium text-gray-700">Количество циклов: <span id="cycles-value">5</span></label>
-                    <input type="range" id="cycles-slider" name="cycles" min="3" max="20" value="5" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <label for="cycles-slider" class="block text-sm font-medium text-gray-700">Количество циклов: <span id="cycles-value">3</span></label>
+                    <input type="range" id="cycles-slider" name="cycles" min="3" max="20" value="3" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                 </div>
                 <div>
                     <label for="mode-select" class="block text-sm font-medium text-gray-700">Режим дыхания:</label>
