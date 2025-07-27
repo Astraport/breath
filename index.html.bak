@@ -3,19 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Контроль Дыхания v4</title>
+    <title>Тренажер Дыхания v1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-    <!-- Chosen Palette: Calm Harmony -->
-    <!-- Application Structure Plan: The app is now fully button-controlled, removing the slider. The main view is fullscreen. The visualization logic has been overhauled to show a 4-segment progress ring where one rotation equals one full breathing cycle, driven by a timer in prescriptive mode. -->
-    <!-- Visualization & Content Choices: 
-        - Main Interaction (Button): A large, central button is the only control. It starts the session and advances through phases. This simplifies interaction significantly.
-        - Visual Timer (Overhauled): A conic-gradient is used to draw 4 static segments representing the breathing ratios. A second conic-gradient is used as a rotating mask, animated with requestAnimationFrame, to reveal the segments and show progress through the full cycle.
-        - Scoring/Feedback: Scoring in visualization mode is now based on how closely the user's button clicks match the ideal transition times between animated segments. Measurement mode (no visualization) still scores based on ratios.
-        - Sound Feedback: Tone.js remains for immersive audio cues.
-        - Hints & Settings Persistence: Hints are larger and clearer. Settings persistence via localStorage is retained.
-    -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         html, body {
             height: 100%;
@@ -77,13 +67,14 @@
                  <div>
                     <label class="block text-sm font-medium text-gray-700">Режим</label>
                     <div class="mt-2 grid grid-cols-2 gap-3">
+                        
                         <label class="relative">
-                            <input type="radio" name="app-mode" value="game" class="sr-only peer" checked>
-                            <span class="border rounded-md py-2 px-3 flex items-center justify-center text-sm font-medium cursor-pointer transition-colors peer-checked:bg-teal-50 peer-checked:border-teal-500 peer-checked:text-teal-900">Игра</span>
-                        </label>
-                        <label class="relative">
-                            <input type="radio" name="app-mode" value="visual" class="sr-only peer">
+                            <input type="radio" name="app-mode" value="visual" class="sr-only peer" checked>
                             <span class="border rounded-md py-2 px-3 flex items-center justify-center text-sm font-medium cursor-pointer transition-colors peer-checked:bg-teal-50 peer-checked:border-teal-500 peer-checked:text-teal-900">Визуализация</span>
+                        </label>
+						<label class="relative">
+                            <input type="radio" name="app-mode" value="game" class="sr-only peer">
+                            <span class="border rounded-md py-2 px-3 flex items-center justify-center text-sm font-medium cursor-pointer transition-colors peer-checked:bg-teal-50 peer-checked:border-teal-500 peer-checked:text-teal-900">Игра</span>
                         </label>
                     </div>
                 </div>
