@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateUI() {
         cycleCounterEl.textContent = `Цикл ${state.currentCycle || 0} / ${state.settings.cycles || 5}`;
-        let labelText = 'Приготовьтесь';
+        let labelText = '';
         let buttonColor = 'bg-gray-400';
         let buttonIconHTML = ICONS_SVG.play;
         let phaseIconHTML = '';
