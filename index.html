@@ -124,22 +124,22 @@
                     <div id="cycle-counter" class="text-sm text-gray-500">Цикл 0 / 0</div>
                 </div>
 
-                <div id="control-area" class="w-full flex items-center justify-center my-4 flex-grow">
+                <div id="control-area" class="w-full flex flex-col items-center justify-center my-4 flex-grow">
                      <div id="visualizer-container" class="relative w-64 h-64 flex items-center justify-center">
                         <div id="visualizer" class="w-full h-full rounded-full"></div>
                         <div class="absolute flex flex-col items-center justify-center text-center">
                             <div id="phase-icon" class="w-12 h-12 mb-2 text-shadow"></div>
-                            <div id="phase-label" class="text-2xl font-bold text-[#5F9EA0] text-shadow"></div>
+                            <div id="phase-label" class="text-2xl font-bold text-[#5F9EA0] text-shadow">Приготовьтесь</div>
                             <div id="phase-duration" class="text-sm text-gray-500 text-shadow"></div>
                         </div>
-                        <button id="start-visualizer-btn" class="hidden absolute w-32 h-32 rounded-full text-white flex items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 bg-teal-500">
-                             <span class="text-2xl font-bold">Старт</span>
-                        </button>
                     </div>
-                     <button id="breathing-button" class="w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105">
-                        <div id="button-icon" class="w-16 h-16"></div>
-                        <div id="button-phase-label" class="text-lg font-bold mt-2"></div>
-                    </button>
+                     <div id="game-mode-container" class="flex flex-col items-center justify-center">
+                        <div id="game-instructions" class="hidden text-center text-gray-600 mb-4 p-3 rounded-md bg-gray-100 border border-gray-200 text-sm"></div>
+                        <button id="breathing-button" class="w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105">
+                            <div id="button-icon" class="w-16 h-16"></div>
+                            <div id="button-phase-label" class="text-lg font-bold mt-2"></div>
+                        </button>
+                     </div>
                 </div>
                 
                 <div id="hint-box" class="hidden w-full flex items-center px-2 h-32 flex-shrink-0">
@@ -188,6 +188,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const phaseDurationEl = document.getElementById('phase-duration');
     const cycleCounterEl = document.getElementById('cycle-counter');
     const visualizerContainer = document.getElementById('visualizer-container');
+	const gameInstructions = document.getElementById('game-instructions');
+	const gameModeContainer = document.getElementById('game-mode-container');
 
     const finalScoreEl = document.getElementById('final-score');
     const finalRatingEl = document.getElementById('final-rating');
@@ -424,6 +426,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateUI();
         } else {
             state.fsm = 'ready';
+            const selectedModeText = modeSelect.options[modeSelect.selectedIndex].text;
+            gameInstructions.textContent = `Вам нужно дышать в соответствии с пропорцией выбранного режима дыхания, а именно ${selectedModeText}. То есть вдохом в начале каждого цикла дыхания, вы задаете длительность других фаз и придерживаетесь этому ритму нажимая на кнопку в конце каждой фазы дыхания.`;
+            gameInstructions.classList.remove('hidden');
             updateUI();
         }
     }
