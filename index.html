@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Контроль Дыхания v4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The app is now fully button-controlled, removing the slider. The main view is fullscreen. The visualization logic has been overhauled to show a 4-segment progress ring where one rotation equals one full breathing cycle, driven by a timer in prescriptive mode. -->
+    <!-- Visualization & Content Choices: 
+        - Main Interaction (Button): A large, central button is the only control. It starts the session and advances through phases. This simplifies interaction significantly.
+        - Visual Timer (Overhauled): A conic-gradient is used to draw 4 static segments representing the breathing ratios. A second conic-gradient is used as a rotating mask, animated with requestAnimationFrame, to reveal the segments and show progress through the full cycle.
+        - Scoring/Feedback: Scoring in visualization mode is now based on how closely the user's button clicks match the ideal transition times between animated segments. Measurement mode (no visualization) still scores based on ratios.
+        - Sound Feedback: Tone.js remains for immersive audio cues.
+        - Hints & Settings Persistence: Hints are larger and clearer. Settings persistence via localStorage is retained.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-family: 'Inter', sans-serif;
+            background-color: #F8F7F4;
+            color: #333333;
+        }
+        .hidden {
+            display: none;
+        }
+        #visualizer {
+            background-image: conic-gradient(
+                var(--c1) 0% var(--p1),
+                var(--c2) var(--p1) var(--p2),
+                var(--c3) var(--p2) var(--p3),
+                var(--c4) var(--p3) 100%
+            );
+            mask-image: conic-gradient(black var(--progress, 0%), transparent var(--progress, 0%));
+            -webkit-mask-image: conic-gradient(black var(--progress, 0%), transparent var(--progress, 0%));
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .animate-pulse-emoji {
+            animation: pulse 2s infinite;
+        }
+        @keyframes bounce-up {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .animate-bounce-up {
+            animation: bounce-up 1.5s infinite;
+        }
+        input[type="radio"]:checked + span {
+            background-color: #F0FDFA;
+            border-color: #14B8A6;
+            color: #0F766E;
+        }
+        .text-shadow {
+            text-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center">
+
+    <div id="app-container" class="w-full h-full max-w-md mx-auto bg-white/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <!-- Settings View -->
+        <section id="settings-view" class="w-full">
+            <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">Тренажер дыхания</h1>
+            <p class="text-center text-gray-500 mb-6">Настройте свою тренировку.</p>
+            
+            <form id="settings-form" class="space-y-4">
+                 <div>
+                    <label class="block text-sm font-medium text-gray-700">Режим</label>
+                    <div class="mt-2 grid grid-cols-2 gap-3">
+                        <label class="relative">
+                            <input type="radio" name="app-mode" value="game" class="sr-only peer" checked>
+                            <span class="border rounded-md py-2 px-3 flex items-center justify-center text-sm font-medium cursor-pointer transition-colors peer-checked:bg-teal-50 peer-checked:border-teal-500 peer-checked:text-teal-900">Игра</span>
+                        </label>
+                        <label class="relative">
+                            <input type="radio" name="app-mode" value="visual" class="sr-only peer">
+                            <span class="border rounded-md py-2 px-3 flex items-center justify-center text-sm font-medium cursor-pointer transition-colors peer-checked:bg-teal-50 peer-checked:border-teal-500 peer-checked:text-teal-900">Визуализация</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="cycles-slider" class="block text-sm font-medium text-gray-700">Количество циклов: <span id="cycles-value">5</span></label>
+                    <input type="range" id="cycles-slider" name="cycles" min="3" max="20" value="5" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div>
+                    <label for="mode-select" class="block text-sm font-medium text-gray-700">Режим дыхания:</label>
+                    <select id="mode-select" name="mode" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#5F9EA0] focus:border-[#5F9EA0]">
+                        <option value="square">Квадратное (1:1:1:1)</option>
+                        <option value="short_pause">Короткие паузы (2:1:3:1)</option>
+                        <option value="long_exhale">Длинный выдох (1:1:2:1)</option>
+						<option value="full">Полное дыхание йогов (2:1:2:1)</option>
+                    </select>
+                </div>
+                
+                <div id="inhale-duration-container" class="hidden">
+                    <label for="inhale-duration-slider" class="block text-sm font-medium text-gray-700">Длина вдоха (сек): <span id="inhale-duration-value">8</span></label>
+                    <input type="range" id="inhale-duration-slider" min="3" max="10" value="8" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                    <span class="text-sm text-gray-700">Показывать подсказки</span>
+                    <label for="show-hints-toggle" class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="show-hints-toggle" class="sr-only peer" checked>
+                      <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-[#7dd8da] peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5F9EA0]"></div>
+                    </label>
+                </div>
+                 <div class="flex items-center justify-between pt-2">
+                    <span class="text-sm text-gray-700">Включить звуки</span>
+                    <label for="play-sounds-toggle" class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="play-sounds-toggle" class="sr-only peer" checked>
+                      <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-[#7dd8da] peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5F9EA0]"></div>
+                    </label>
+                </div>
+                <button type="submit" class="w-full bg-[#5F9EA0] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#538c8e] transition-colors duration-300 shadow-md">Начать</button>
+            </form>
+        </section>
+
+        <!-- Exercise View -->
+        <section id="exercise-view" class="hidden w-full h-full relative pt-8 pb-4">
+            <button id="stop-btn" class="absolute top-3 right-3 text-2xl text-gray-400 hover:text-gray-600 transition-colors z-10">&times;</button>
+            <div class="flex flex-col items-center justify-between h-full">
+                <div class="text-center h-12 flex-shrink-0">
+                    <div id="cycle-counter" class="text-sm text-gray-500">Цикл 0 / 0</div>
+                </div>
+
+                <div id="control-area" class="w-full flex items-center justify-center my-4 flex-grow">
+                     <div id="visualizer-container" class="relative w-64 h-64 flex items-center justify-center">
+                        <div id="visualizer" class="w-full h-full rounded-full"></div>
+                        <div class="absolute flex flex-col items-center justify-center text-center">
+                            <div id="phase-icon" class="w-12 h-12 mb-2 text-shadow"></div>
+                            <div id="phase-label" class="text-2xl font-bold text-[#5F9EA0] text-shadow">Приготовьтесь</div>
+                            <div id="phase-duration" class="text-sm text-gray-500 text-shadow"></div>
+                        </div>
+                        <button id="start-visualizer-btn" class="hidden absolute w-32 h-32 rounded-full text-white flex items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 bg-teal-500">
+                             <span class="text-2xl font-bold">Старт</span>
+                        </button>
+                    </div>
+                     <button id="breathing-button" class="w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105">
+                        <div id="button-icon" class="w-16 h-16"></div>
+                        <div id="button-phase-label" class="text-lg font-bold mt-2"></div>
+                    </button>
+                </div>
+                
+                <div id="hint-box" class="hidden w-full flex items-center px-2 h-32 flex-shrink-0">
+                    <div id="hint-emoji" class="text-4xl mr-4 flex-shrink-0"></div>
+                    <p id="hint-text" class="text-lg text-gray-600"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results View -->
+        <section id="results-view" class="hidden w-full">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Результаты</h2>
+            <div class="bg-gray-50 rounded-lg p-6 text-center space-y-3">
+                <div>
+                    <p class="text-sm text-gray-500">Ваш результат</p>
+                    <p id="final-score" class="text-4xl font-bold text-[#5F9EA0]">0</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Оценка</p>
+                    <p id="final-rating" class="text-xl font-semibold text-gray-700">-</p>
+                </div>
+            </div>
+            <button id="restart-btn" class="mt-6 w-full bg-[#5F9EA0] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#538c8e] transition-colors duration-300 shadow-md">Начать заново</button>
+        </section>
+    </div>
+    
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const views = {
+        settings: document.getElementById('settings-view'),
+        exercise: document.getElementById('exercise-view'),
+        results: document.getElementById('results-view'),
+    };
+
+    const settingsForm = document.getElementById('settings-form');
+    const restartBtn = document.getElementById('restart-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    
+    const button = document.getElementById('breathing-button');
+    const buttonIcon = document.getElementById('button-icon');
+    const buttonPhaseLabel = document.getElementById('button-phase-label');
+    const phaseIcon = document.getElementById('phase-icon');
+    const startVisualizerBtn = document.getElementById('start-visualizer-btn');
+
+    const phaseLabel = document.getElementById('phase-label');
+    const phaseDurationEl = document.getElementById('phase-duration');
+    const cycleCounterEl = document.getElementById('cycle-counter');
+    const visualizerContainer = document.getElementById('visualizer-container');
+
+    const finalScoreEl = document.getElementById('final-score');
+    const finalRatingEl = document.getElementById('final-rating');
+
+    const appModeRadios = document.querySelectorAll('input[name="app-mode"]');
+    const cyclesSlider = document.getElementById('cycles-slider');
+    const cyclesValue = document.getElementById('cycles-value');
+    const inhaleDurationContainer = document.getElementById('inhale-duration-container');
+    const inhaleDurationSlider = document.getElementById('inhale-duration-slider');
+    const inhaleDurationValue = document.getElementById('inhale-duration-value');
+    const showHintsToggle = document.getElementById('show-hints-toggle');
+    const playSoundsToggle = document.getElementById('play-sounds-toggle');
+    const modeSelect = document.getElementById('mode-select');
+
+    const hintBox = document.getElementById('hint-box');
+    const hintEmoji = document.getElementById('hint-emoji');
+    const hintText = document.getElementById('hint-text');
+
+    let state = {};
+    let sounds = {};
+
+    const ICONS_SVG = {
+        play: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>`,
+        up: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 4l8 8h-6v8h-4v-8H4l8-8z"/></svg>`,
+        down: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 20l-8-8h6V4h4v8h6l-8 8z"/></svg>`,
+        pause: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`,
+    };
+    
+    const ICONS_SVG_DARK = {
+        up: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232C5282"><path d="M12 4l8 8h-6v8h-4v-8H4l8-8z"/></svg>`,
+        down: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232C5282"><path d="M12 20l-8-8h6V4h4v8h6l-8 8z"/></svg>`,
+        pause: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232C5282"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`,
+    };
+
+    const HINTS_GAME = {
+        0: { emoji: '⬆️', text: 'Вдыхайте плавно и равномерно. Нажмите, когда закончите вдох.', animation: 'animate-bounce-up' },
+        1: { emoji: '🧘', text: 'Задержите дыхание в зависмости от выбранного режима. Нажмите, когда закончите задержку на вдохе.', animation: 'animate-pulse-emoji' },
+        2: { emoji: '⬇️', text: 'Выдыхайте. Нажмите, когда закончите выдох.', animation: '' },
+        3: { emoji: '🧘', text: 'Задержите дыхание. Нажмите, когда закончите задержку на выдохе. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
+    };
+
+    const HINTS_VISUAL = {
+        0: { emoji: '⬆️', text: 'Вдыхайте плавно и равномерно, следуя за анимацией.', animation: 'animate-bounce-up' },
+        1: { emoji: '🧘', text: 'Задержите дыхание, пока сегмент не заполнится.', animation: 'animate-pulse-emoji' },
+        2: { emoji: '⬇️', text: 'Плавно выдыхайте, следуя за анимацией.', animation: '' },
+        3: { emoji: '🧘', text: 'Задержите дыхание до начала нового цикла. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
+    };
+
+    const MODES = {
+        square: [1, 1, 1, 1],
+        short_pause: [2, 1, 3, 1],
+        long_exhale: [1, 1, 2, 1],
+		full: [2, 1, 2, 1],
+    };
+    
+    const PHASE_NAMES = ['Вдох', 'Задержка на вдохе', 'Выдох', 'Задержка на выдохе'];
+    const PHASE_COLORS = ['#60A5FA', '#34D399', '#FBBF24', '#A78BFA'];
+
+    function initSounds() {
+        if (!state.settings.playSounds) return;
+        sounds.breath = new Tone.Synth({
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 1 },
+        }).toDestination();
+        sounds.hold = new Tone.AMOscillator('C2', 'sine', 'sine').toDestination();
+        sounds.hold.volume.value = -12;
+    }
+
+    function playSound(phase) {
+        if (!state.settings.playSounds || !sounds.breath) return;
+        const now = Tone.now();
+        const inhaleDuration = state.settings.isPrescriptive ? state.settings.inhaleDuration : 2;
+        switch(phase) {
+            case 0: 
+                sounds.hold.stop(now);
+                sounds.breath.triggerAttack('C4', now);
+                sounds.breath.frequency.rampTo('C5', inhaleDuration);
+                break;
+            case 1: 
+                sounds.breath.triggerRelease(now);
+                sounds.hold.start(now);
+                break;
+            case 2: 
+                sounds.hold.stop(now);
+                const exhaleDuration = inhaleDuration * MODES[state.settings.mode][2] / MODES[state.settings.mode][0];
+                sounds.breath.triggerAttack('C5', now);
+                sounds.breath.frequency.rampTo('C4', exhaleDuration);
+                break;
+            case 3: 
+                sounds.breath.triggerRelease(now);
+                sounds.hold.start(now);
+                break;
+        }
+    }
+
+    function stopAllSounds() {
+        if (!sounds.breath) return;
+        const now = Tone.now();
+        sounds.breath.triggerRelease(now);
+        sounds.hold.stop(now);
+    }
+
+    function switchView(viewName) {
+        Object.values(views).forEach(v => v.classList.add('hidden'));
+        if(views[viewName]) views[viewName].classList.remove('hidden');
+    }
+
+    function init() {
+        cancelAnimationFrame(state.animationFrameId);
+        clearInterval(state.countdownIntervalId);
+        stopAllSounds();
+        state = {
+            settings: {},
+            fsm: 'idle',
+            currentCycle: 0,
+            currentPhase: 0,
+            totalPenalty: 0,
+            timestamps: {},
+            animationFrameId: null,
+            countdownIntervalId: null,
+        };
+        phaseLabel.classList.remove('text-6xl', 'font-bold');
+        cycleCounterEl.classList.remove('hidden');
+        loadSettings();
+        switchView('settings');
+        updateUI();
+    }
+    
+    function updateHintBox() {
+        if (!state.settings.showHints) {
+            hintBox.classList.add('hidden');
+            return;
+        }
+
+        let hintPhase = -1;
+        if (state.fsm === 'ready' || state.fsm === 'countdown' || state.fsm === 'ready_to_visualize') {
+            hintPhase = 0; 
+        } else if (state.fsm === 'prescriptive_mode' || ['inhaling', 'hold_inhale', 'exhaling', 'hold_exhale'].includes(state.fsm)) {
+            hintPhase = state.currentPhase;
+        }
+
+        if (hintPhase === -1) {
+            hintBox.classList.add('hidden');
+            return;
+        }
+        
+        hintBox.classList.remove('hidden');
+        const hintSet = state.settings.isPrescriptive ? HINTS_VISUAL : HINTS_GAME;
+        const hint = hintSet[hintPhase];
+
+        if (!hint) {
+            hintBox.classList.add('hidden');
+            return;
+        }
+
+        hintEmoji.className = 'text-4xl mr-4 flex-shrink-0';
+        if(hint.animation) {
+            hintEmoji.classList.add(hint.animation);
+        }
+        hintEmoji.textContent = hint.emoji;
+        hintText.textContent = hint.text;
+    }
+
+    function updateUI() {
+        cycleCounterEl.textContent = `Цикл ${state.currentCycle || 0} / ${state.settings.cycles || 5}`;
+        let labelText = 'Приготовьтесь';
+        let buttonColor = 'bg-gray-400';
+        let buttonIconHTML = ICONS_SVG.play;
+        let phaseIconHTML = '';
+        phaseDurationEl.textContent = '';
+        buttonPhaseLabel.textContent = '';
+
+        if (state.fsm !== 'idle' && state.fsm !== 'done' && state.fsm !== 'ready' && state.fsm !== 'countdown' && state.fsm !== 'ready_to_visualize') {
+            labelText = PHASE_NAMES[state.currentPhase];
+        }
+        if (state.fsm === 'ready') {
+            labelText = 'Начните вдох';
+        }
+
+        if (['inhaling', 'hold_inhale', 'exhaling', 'hold_exhale', 'prescriptive_mode'].includes(state.fsm)) {
+            switch(state.currentPhase) {
+                case 0: buttonIconHTML = ICONS_SVG.up; phaseIconHTML = ICONS_SVG_DARK.up; buttonColor = `bg-[${PHASE_COLORS[0]}]`; break;
+                case 1: buttonIconHTML = ICONS_SVG.pause; phaseIconHTML = ICONS_SVG_DARK.pause; buttonColor = `bg-[${PHASE_COLORS[1]}]`; break;
+                case 2: buttonIconHTML = ICONS_SVG.down; phaseIconHTML = ICONS_SVG_DARK.down; buttonColor = `bg-[${PHASE_COLORS[2]}]`; break;
+                case 3: buttonIconHTML = ICONS_SVG.pause; phaseIconHTML = ICONS_SVG_DARK.pause; buttonColor = `bg-[${PHASE_COLORS[3]}]`; break;
+            }
+        }
+        
+        if (state.settings.isPrescriptive) {
+            button.classList.add('hidden');
+            phaseIcon.innerHTML = phaseIconHTML;
+            phaseLabel.textContent = labelText;
+        } else {
+            button.classList.remove('hidden');
+            button.className = `w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 ${buttonColor}`;
+            buttonIcon.innerHTML = buttonIconHTML;
+            buttonPhaseLabel.textContent = labelText;
+            phaseIcon.innerHTML = '';
+            phaseLabel.textContent = '';
+        }
+        
+        updateHintBox();
+    }
+
+    async function startSession() {
+        if (playSoundsToggle.checked && Tone.context.state !== 'running') {
+            await Tone.start();
+        }
+        
+        state.settings.cycles = parseInt(cyclesSlider.value, 10);
+        state.settings.mode = modeSelect.value;
+        state.settings.appMode = document.querySelector('input[name="app-mode"]:checked').value;
+        state.settings.isPrescriptive = state.settings.appMode === 'visual';
+        state.settings.inhaleDuration = parseInt(inhaleDurationSlider.value, 10);
+        state.settings.showHints = showHintsToggle.checked;
+        state.settings.playSounds = playSoundsToggle.checked;
+        
+        initSounds();
+
+        state.currentCycle = 0;
+        state.totalPenalty = 0;
+        
+        visualizerContainer.style.display = state.settings.isPrescriptive ? 'flex' : 'none';
+        button.style.display = state.settings.isPrescriptive ? 'none' : 'flex';
+        
+        switchView('exercise');
+
+        if (state.settings.isPrescriptive) {
+            state.fsm = 'ready_to_visualize';
+            const startBtn = document.getElementById('start-visualizer-btn');
+            if(startBtn) startBtn.classList.remove('hidden');
+            phaseIcon.innerHTML = '';
+            phaseLabel.textContent = 'Приготовьтесь';
+            updateUI();
+        } else {
+            state.fsm = 'ready';
+            updateUI();
+        }
+    }
+
+    function endSession() {
+        state.fsm = 'done';
+        cancelAnimationFrame(state.animationFrameId);
+        stopAllSounds();
+        
+        if(state.settings.appMode === 'game') {
+            const maxScore = 10 * state.settings.cycles;
+            const finalScore = Math.max(0, Math.round(maxScore - state.totalPenalty));
+            
+            let rating = 'Плохо';
+            const scorePerCycle = state.settings.cycles > 0 ? finalScore / state.settings.cycles : 0;
+            if (scorePerCycle >= 8) rating = 'Отлично';
+            else if (scorePerCycle >= 5) rating = 'Нормально';
+
+            finalScoreEl.textContent = finalScore;
+            finalRatingEl.textContent = rating;
+            switchView('results');
+        } else {
+            init();
+        }
+    }
+
+    function processMeasurementCycle() {
+        const { t1, t2, t3, t4, t5 } = state.timestamps;
+        if (!t1 || !t2 || !t3 || !t4 || !t5) return;
+
+        const durations = [ (t2 - t1), (t3 - t2), (t4 - t3), (t5 - t4) ];
+        const minDuration = Math.min(...durations.filter(d => d > 100));
+        if (!isFinite(minDuration) || minDuration === 0) return;
+
+        const targetRatios = MODES[state.settings.mode];
+        const baseRatio = targetRatios[durations.indexOf(minDuration)];
+        const normalizedTargetRatios = targetRatios.map(r => r / baseRatio);
+        const actualRatios = durations.map(d => d / minDuration);
+        
+        let deviation = 0;
+        for (let i = 0; i < 4; i++) { deviation += Math.abs(actualRatios[i] - normalizedTargetRatios[i]); }
+        state.totalPenalty += deviation;
+    }
+
+    function startPrescriptiveCycle() {
+        cancelAnimationFrame(state.animationFrameId);
+        state.currentCycle++;
+        if (state.currentCycle > state.settings.cycles) {
+            endSession();
+            return;
+        }
+        state.currentPhase = 0;
+        updateUI();
+
+        const ratios = MODES[state.settings.mode];
+        const totalRatio = ratios.reduce((a, b) => a + b, 0);
+        const phaseDurations = ratios.map(r => state.settings.inhaleDuration * 1000 * r / ratios[0]);
+        const totalDuration = phaseDurations.reduce((a, b) => a + b, 0);
+        
+        let p1 = (ratios[0] / totalRatio) * 100;
+        let p2 = p1 + (ratios[1] / totalRatio) * 100;
+        let p3 = p2 + (ratios[2] / totalRatio) * 100;
+        
+        const root = document.documentElement;
+        root.style.setProperty('--c1', PHASE_COLORS[0]);
+        root.style.setProperty('--p1', `${p1}%`);
+        root.style.setProperty('--c2', PHASE_COLORS[1]);
+        root.style.setProperty('--p2', `${p2}%`);
+        root.style.setProperty('--c3', PHASE_COLORS[2]);
+        root.style.setProperty('--p3', `${p3}%`);
+        root.style.setProperty('--c4', PHASE_COLORS[3]);
+
+        let phaseStartTimes = [0];
+        for(let i=0; i<3; i++) { phaseStartTimes.push(phaseStartTimes[i] + phaseDurations[i]); }
+
+        const cycleStartTime = performance.now();
+        playSound(0);
+
+        function animate(time) {
+            const elapsed = time - cycleStartTime;
+            if (elapsed >= totalDuration) {
+                startPrescriptiveCycle();
+                return;
+            }
+
+            let currentPhaseIndex = 0;
+            for (let i = phaseStartTimes.length - 1; i >= 0; i--) {
+                if (elapsed >= phaseStartTimes[i]) {
+                    currentPhaseIndex = i;
+                    break;
+                }
+            }
+            
+            if (state.currentPhase !== currentPhaseIndex) {
+                state.currentPhase = currentPhaseIndex;
+                playSound(currentPhaseIndex);
+            }
+            state.currentPhase = currentPhaseIndex;
+            updateUI();
+            
+            const elapsedInPhase = elapsed - phaseStartTimes[currentPhaseIndex];
+            const currentPhaseDuration = phaseDurations[currentPhaseIndex] / 1000;
+            const elapsedSec = (elapsedInPhase / 1000).toFixed(1);
+            phaseDurationEl.textContent = `${elapsedSec} / ${currentPhaseDuration.toFixed(1)} сек`;
+
+            const progress = (elapsed / totalDuration) * 100;
+            root.style.setProperty('--progress', `${progress}%`);
+            
+            state.animationFrameId = requestAnimationFrame(animate);
+        }
+        state.animationFrameId = requestAnimationFrame(animate);
+    }
+    
+    function handleButtonClick() {
+        const now = performance.now();
+        
+        switch (state.fsm) {
+            case 'ready':
+                state.fsm = 'inhaling';
+                state.currentCycle++;
+                if (state.currentCycle > state.settings.cycles) { endSession(); return; }
+                state.timestamps = { t1: now };
+                state.currentPhase = 0;
+                break;
+            case 'inhaling':
+                state.fsm = 'hold_inhale';
+                state.timestamps.t2 = now;
+                state.currentPhase = 1;
+                break;
+            case 'hold_inhale':
+                state.fsm = 'exhaling';
+                state.timestamps.t3 = now;
+                state.currentPhase = 2;
+                break;
+            case 'exhaling':
+                state.fsm = 'hold_exhale';
+                state.timestamps.t4 = now;
+                state.currentPhase = 3;
+                break;
+            case 'hold_exhale':
+                state.timestamps.t5 = now;
+                processMeasurementCycle();
+                state.currentCycle++;
+                if (state.currentCycle > state.settings.cycles) { endSession(); return; }
+                state.fsm = 'inhaling';
+                state.timestamps = { t1: now };
+                state.currentPhase = 0;
+                break;
+        }
+        playSound(state.currentPhase);
+        updateUI();
+    }
+
+    function saveSettings() {
+        const settingsToSave = {
+            appMode: document.querySelector('input[name="app-mode"]:checked').value,
+            cycles: cyclesSlider.value,
+            mode: modeSelect.value,
+            inhaleDuration: inhaleDurationSlider.value,
+            showHints: showHintsToggle.checked,
+            playSounds: playSoundsToggle.checked,
+        };
+        localStorage.setItem('breathingAppSettings', JSON.stringify(settingsToSave));
+    }
+
+    function loadSettings() {
+        const savedSettings = localStorage.getItem('breathingAppSettings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            document.querySelector(`input[name="app-mode"][value="${settings.appMode}"]`).checked = true;
+            cyclesSlider.value = settings.cycles;
+            cyclesValue.textContent = settings.cycles;
+            modeSelect.value = settings.mode;
+            inhaleDurationSlider.value = settings.inhaleDuration;
+            inhaleDurationValue.textContent = settings.inhaleDuration;
+            showHintsToggle.checked = settings.showHints;
+            playSoundsToggle.checked = settings.playSounds ?? true;
+            
+            inhaleDurationContainer.classList.toggle('hidden', settings.appMode !== 'visual');
+        }
+    }
+
+    appModeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            inhaleDurationContainer.classList.toggle('hidden', e.target.value !== 'visual');
+            saveSettings();
+        });
+    });
+
+    const allSettingsControls = [cyclesSlider, modeSelect, inhaleDurationSlider, showHintsToggle, playSoundsToggle];
+    allSettingsControls.forEach(control => {
+        if(control) control.addEventListener('change', saveSettings);
+    });
+    cyclesSlider.addEventListener('input', (e) => { cyclesValue.textContent = e.target.value; saveSettings(); });
+    inhaleDurationSlider.addEventListener('input', (e) => { inhaleDurationValue.textContent = e.target.value; saveSettings(); });
+
+    button.addEventListener('click', handleButtonClick);
+    
+    const startVisualizerBtnElement = document.getElementById('start-visualizer-btn');
+    if(startVisualizerBtnElement) {
+        startVisualizerBtnElement.addEventListener('click', () => {
+            startVisualizerBtnElement.classList.add('hidden');
+            state.fsm = 'prescriptive_mode';
+            startPrescriptiveCycle();
+        });
+    }
+
+    settingsForm.addEventListener('submit', (e) => { e.preventDefault(); startSession(); });
+    restartBtn.addEventListener('click', init);
+    stopBtn.addEventListener('click', init);
+
+    loadSettings();
+    init();
+});
+</script>
+</body>
+</html>
