@@ -543,6 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function handleButtonClick() {
+	gameInstructions.classList.add('hidden');
         const now = performance.now();
         
         switch (state.fsm) {
