@@ -93,9 +93,9 @@
                     </select>
                 </div>
                 
-                <div id="inhale-duration-container" class="hidden">
-                    <label for="inhale-duration-slider" class="block text-sm font-medium text-gray-700">Длина вдоха (сек): <span id="inhale-duration-value">8</span></label>
-                    <input type="range" id="inhale-duration-slider" min="3" max="10" value="8" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <div id="inhale-duration-container">
+                    <label for="inhale-duration-slider" class="block text-sm font-medium text-gray-700">Длина вдоха (сек): <span id="inhale-duration-value">3</span></label>
+                    <input type="range" id="inhale-duration-slider" min="3" max="10" value="3" class="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                 </div>
 
                 <div class="flex items-center justify-between pt-2">
@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateUI() {
         cycleCounterEl.textContent = `Цикл ${state.currentCycle || 0} / ${state.settings.cycles || 5}`;
-        let labelText = '';
+        let labelText = 'Приготовьтесь';
         let buttonColor = 'bg-gray-400';
         let buttonIconHTML = ICONS_SVG.play;
         let phaseIconHTML = '';
@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const startBtn = document.getElementById('start-visualizer-btn');
             if(startBtn) startBtn.classList.remove('hidden');
             phaseIcon.innerHTML = '';
-            phaseLabel.textContent = 'Приготовьтесь';
+            phaseLabel.textContent = '';
             updateUI();
         } else {
             state.fsm = 'ready';
