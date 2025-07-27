@@ -6,6 +6,7 @@
     <title>Тренажер Дыхания v1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+  
     <style>
         html, body {
             height: 100%;
@@ -119,7 +120,7 @@
         <!-- Exercise View -->
         <section id="exercise-view" class="hidden w-full h-full relative pt-8 pb-4">
             <button id="stop-btn" class="absolute top-3 right-3 text-2xl text-gray-400 hover:text-gray-600 transition-colors z-10">&times;</button>
-            <div class="flex flex-col items-center justify-between h-full">
+            <div class="flex flex-col items-center justify-start h-full">
                 <div class="text-center h-12 flex-shrink-0">
                     <div id="cycle-counter" class="text-sm text-gray-500">Цикл 0 / 0</div>
                 </div>
@@ -132,6 +133,10 @@
                             <div id="phase-label" class="text-2xl font-bold text-[#5F9EA0] text-shadow">Приготовьтесь</div>
                             <div id="phase-duration" class="text-sm text-gray-500 text-shadow"></div>
                         </div>
+                         <button id="start-visualizer-btn" class="hidden absolute w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 bg-teal-500">
+                             <div id="start-button-icon" class="w-16 h-16"></div>
+                             <div id="start-button-label" class="text-lg font-bold mt-2">Старт</div>
+                        </button>
                     </div>
                      <div id="game-mode-container" class="flex flex-col items-center justify-center">
                         <div id="game-instructions" class="hidden text-center text-gray-600 mb-4 p-3 rounded-md bg-gray-100 border border-gray-200 text-sm"></div>
@@ -183,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const buttonPhaseLabel = document.getElementById('button-phase-label');
     const phaseIcon = document.getElementById('phase-icon');
     const startVisualizerBtn = document.getElementById('start-visualizer-btn');
+    const startButtonIcon = document.getElementById('start-button-icon');
 
     const phaseLabel = document.getElementById('phase-label');
     const phaseDurationEl = document.getElementById('phase-duration');
@@ -228,11 +234,11 @@ document.addEventListener('DOMContentLoaded', () => {
         0: { emoji: '⬆️', text: 'Вдыхайте плавно и равномерно. Нажмите, когда закончите вдох.', animation: 'animate-bounce-up' },
         1: { emoji: '🧘', text: 'Задержите дыхание в зависмости от выбранного режима. Нажмите, когда закончите задержку на вдохе.', animation: 'animate-pulse-emoji' },
         2: { emoji: '⬇️', text: 'Выдыхайте. Нажмите, когда закончите выдох.', animation: '' },
-        3: { emoji: '🧘', text: 'Задержите дыхание. Нажмите, когда закончите задержку на выдохе. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
+        3: { emoji: '�', text: 'Задержите дыхание. Нажмите, когда закончите задержку на выдохе. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
     };
 
     const HINTS_VISUAL = {
-        0: { emoji: '⬆️', text: 'Вдыхайте плавно и равномерно, следуя за анимацией.', animation: 'animate-bounce-up' },
+        0: { emoji: '⬆️', text: 'Приготовьтесь ко вдоху, следуя за анимацией.', animation: 'animate-bounce-up' },
         1: { emoji: '🧘', text: 'Задержите дыхание, пока сегмент не заполнится.', animation: 'animate-pulse-emoji' },
         2: { emoji: '⬇️', text: 'Плавно выдыхайте, следуя за анимацией.', animation: '' },
         3: { emoji: '🧘', text: 'Задержите дыхание до начала нового цикла. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
@@ -379,11 +385,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (state.settings.isPrescriptive) {
-            button.classList.add('hidden');
+            visualizerContainer.classList.remove('hidden');
+            gameModeContainer.classList.add('hidden');
             phaseIcon.innerHTML = phaseIconHTML;
             phaseLabel.textContent = labelText;
         } else {
-            button.classList.remove('hidden');
+            visualizerContainer.classList.add('hidden');
+            gameModeContainer.classList.remove('hidden');
             button.className = `w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 ${buttonColor}`;
             buttonIcon.innerHTML = buttonIconHTML;
             buttonPhaseLabel.textContent = labelText;
@@ -411,9 +419,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         state.currentCycle = 0;
         state.totalPenalty = 0;
-        
-        visualizerContainer.style.display = state.settings.isPrescriptive ? 'flex' : 'none';
-        button.style.display = state.settings.isPrescriptive ? 'none' : 'flex';
         
         switchView('exercise');
 
@@ -647,3 +652,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+�
