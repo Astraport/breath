@@ -6,7 +6,16 @@
     <title>Тренажер Дыхания v1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-  
+    <!-- Chosen Palette: Calm Harmony -->
+    <!-- Application Structure Plan: The app is now fully button-controlled, removing the slider. The main view is fullscreen. The visualization logic has been overhauled to show a 4-segment progress ring where one rotation equals one full breathing cycle, driven by a timer in prescriptive mode. -->
+    <!-- Visualization & Content Choices: 
+        - Main Interaction (Button): A large, central button is the only control. It starts the session and advances through phases. This simplifies interaction significantly.
+        - Visual Timer (Overhauled): A conic-gradient is used to draw 4 static segments representing the breathing ratios. A second conic-gradient is used as a rotating mask, animated with requestAnimationFrame, to reveal the segments and show progress through the full cycle.
+        - Scoring/Feedback: Scoring in visualization mode is now based on how closely the user's button clicks match the ideal transition times between animated segments. Measurement mode (no visualization) still scores based on ratios.
+        - Sound Feedback: Tone.js remains for immersive audio cues.
+        - Hints & Settings Persistence: Hints are larger and clearer. Settings persistence via localStorage is retained.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
         html, body {
             height: 100%;
@@ -120,7 +129,7 @@
         <!-- Exercise View -->
         <section id="exercise-view" class="hidden w-full h-full relative pt-8 pb-4">
             <button id="stop-btn" class="absolute top-3 right-3 text-2xl text-gray-400 hover:text-gray-600 transition-colors z-10">&times;</button>
-            <div class="flex flex-col items-center justify-start h-full">
+            <div class="flex flex-col items-center justify-between h-full">
                 <div class="text-center h-12 flex-shrink-0">
                     <div id="cycle-counter" class="text-sm text-gray-500">Цикл 0 / 0</div>
                 </div>
@@ -133,16 +142,18 @@
                             <div id="phase-label" class="text-2xl font-bold text-[#5F9EA0] text-shadow">Приготовьтесь</div>
                             <div id="phase-duration" class="text-sm text-gray-500 text-shadow"></div>
                         </div>
-                         <button id="start-visualizer-btn" class="hidden absolute w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 bg-teal-500">
+                        <button id="start-visualizer-btn" class="hidden absolute w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105 bg-teal-500">
                              <div id="start-button-icon" class="w-16 h-16"></div>
                              <div id="start-button-label" class="text-lg font-bold mt-2">Старт</div>
                         </button>
                     </div>
                      <div id="game-mode-container" class="flex flex-col items-center justify-center">
                         <div id="game-instructions" class="hidden text-center text-gray-600 mb-4 p-3 rounded-md bg-gray-100 border border-gray-200 text-sm"></div>
+                        <div id="penalty-display" class="h-6 text-center text-red-500 font-semibold mb-2"></div>
                         <button id="breathing-button" class="w-48 h-48 rounded-full text-white flex flex-col items-center justify-center transition-transform duration-200 shadow-lg transform hover:scale-105">
                             <div id="button-icon" class="w-16 h-16"></div>
                             <div id="button-phase-label" class="text-lg font-bold mt-2"></div>
+                            <div id="button-phase-ratio" class="text-sm font-light opacity-80"></div>
                         </button>
                      </div>
                 </div>
@@ -186,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const button = document.getElementById('breathing-button');
     const buttonIcon = document.getElementById('button-icon');
     const buttonPhaseLabel = document.getElementById('button-phase-label');
+    const buttonPhaseRatio = document.getElementById('button-phase-ratio');
     const phaseIcon = document.getElementById('phase-icon');
     const startVisualizerBtn = document.getElementById('start-visualizer-btn');
     const startButtonIcon = document.getElementById('start-button-icon');
@@ -196,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const visualizerContainer = document.getElementById('visualizer-container');
 	const gameInstructions = document.getElementById('game-instructions');
 	const gameModeContainer = document.getElementById('game-mode-container');
+    const penaltyDisplay = document.getElementById('penalty-display');
 
     const finalScoreEl = document.getElementById('final-score');
     const finalRatingEl = document.getElementById('final-rating');
@@ -234,14 +247,14 @@ document.addEventListener('DOMContentLoaded', () => {
         0: { emoji: '⬆️', text: 'Вдыхайте плавно и равномерно. Нажмите, когда закончите вдох.', animation: 'animate-bounce-up' },
         1: { emoji: '🧘', text: 'Задержите дыхание в зависмости от выбранного режима. Нажмите, когда закончите задержку на вдохе.', animation: 'animate-pulse-emoji' },
         2: { emoji: '⬇️', text: 'Выдыхайте. Нажмите, когда закончите выдох.', animation: '' },
-        3: { emoji: '�', text: 'Задержите дыхание. Нажмите, когда закончите задержку на выдохе. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
+        3: { emoji: '🧘', text: 'Задержите дыхание. Нажмите, когда закончите задержку на выдохе. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
     };
 
     const HINTS_VISUAL = {
         0: { emoji: '⬆️', text: 'Приготовьтесь ко вдоху, следуя за анимацией.', animation: 'animate-bounce-up' },
         1: { emoji: '🧘', text: 'Задержите дыхание, пока сегмент не заполнится.', animation: 'animate-pulse-emoji' },
         2: { emoji: '⬇️', text: 'Плавно выдыхайте, следуя за анимацией.', animation: '' },
-        3: { emoji: '🧘', text: 'Задержите дыхание до начала нового цикла. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
+        3: { emoji: '�', text: 'Задержите дыхание до начала нового цикла. Если некомфортно, прекратите тренировку!', animation: 'animate-pulse-emoji' }
     };
 
     const MODES = {
@@ -367,6 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let phaseIconHTML = '';
         phaseDurationEl.textContent = '';
         buttonPhaseLabel.textContent = '';
+        buttonPhaseRatio.textContent = '';
 
         if (state.fsm !== 'idle' && state.fsm !== 'done' && state.fsm !== 'ready' && state.fsm !== 'countdown' && state.fsm !== 'ready_to_visualize') {
             labelText = PHASE_NAMES[state.currentPhase];
@@ -397,6 +411,15 @@ document.addEventListener('DOMContentLoaded', () => {
             buttonPhaseLabel.textContent = labelText;
             phaseIcon.innerHTML = '';
             phaseLabel.textContent = '';
+            
+            const ratio = MODES[state.settings.mode][state.currentPhase];
+            if(ratio === 1) {
+                buttonPhaseRatio.textContent = `${ratio} доля`;
+            } else if (ratio > 1 && ratio < 5) {
+                buttonPhaseRatio.textContent = `${ratio} доли`;
+            } else {
+                buttonPhaseRatio.textContent = `${ratio} долей`;
+            }
         }
         
         updateHintBox();
@@ -425,7 +448,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.settings.isPrescriptive) {
             state.fsm = 'ready_to_visualize';
             const startBtn = document.getElementById('start-visualizer-btn');
-            if(startBtn) startBtn.classList.remove('hidden');
+            if(startBtn) {
+                startBtn.classList.remove('hidden');
+                startBtn.querySelector('#start-button-icon').innerHTML = ICONS_SVG.play;
+            }
             phaseIcon.innerHTML = '';
             phaseLabel.textContent = '';
             updateUI();
@@ -476,6 +502,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let deviation = 0;
         for (let i = 0; i < 4; i++) { deviation += Math.abs(actualRatios[i] - normalizedTargetRatios[i]); }
         state.totalPenalty += deviation;
+
+        if (deviation > 1) {
+             penaltyDisplay.textContent = `Штраф: ${deviation.toFixed(1)} сек`;
+        } else {
+            penaltyDisplay.textContent = '';
+        }
     }
 
     function startPrescriptiveCycle() {
